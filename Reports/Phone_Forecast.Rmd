@@ -1,0 +1,109 @@
+---
+title: "Phone_Forecast"
+author: "Andrew Carlston"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: none
+    df_print: paged
+    highlight: tango
+    theme: flatly
+    toc: yes
+    toc_depth: 1
+params:
+  cx: 1.3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo = FALSE,
+    message = FALSE,
+    warning = FALSE,
+    out.width = "100%",
+    out.height = "500px",
+    fig.pos = "center",
+    dpi = 300)
+```
+
+```{r libraries}
+library(tidyverse)
+library(lubridate)
+library(tidyquant)
+library(plotly)
+library(shiny)
+library(openxlsx)
+library(DT)
+```
+
+# Customer Count
+
+Customer Count is being used as predictive variable that controls the growth rate of the forecast. This Value is being produced by the product team.
+
+-   Updated column is using the percentage 2024 growth rate by month while:
+    -   subtracting the added growth rate from product team \~ 11 %
+    -   adding `r sprintf("%.0f%%", (params$cx - 1) * 100)` growth from 2022 as requested
+-   The 2024 values are including the the growth rate product supplied
+
+```{r data}
+sys.source("../00_Scripts/functions.R", envir = env <- new.env())
+
+cx <- env[["customer_count_data"]]() 
+cx_up <- env[["cx_up"]](cx,value = params$cx)
+cx_chart_up <- env[["cx_chart_up"]](cx,value = params$cx)
+
+```
+
+<details>
+
+<summary>Click to show/hide data table and chart</summary>
+
+<p>
+
+##  {.tabset .tabset-fade .tabset-pills .no-tabset-title}
+
+### Table
+
+```{r table}
+cx_tbl <- cx_up %>%  
+  DT::datatable(
+    extensions = c('Buttons', 'Scroller'),
+    options = list(
+      dom = 'Blrtip',
+      buttons = list(
+        list(
+          extend = 'excel',
+          text = 'Export to Excel'
+        ),
+        list(
+          extend = 'csv',
+          text = 'Export to CSV'
+        )
+      ),
+      defaultPageSize = 50,
+      scrollY = "450px",
+      scrollX = TRUE,
+      scroller = TRUE,
+      rowStyle = "function(index, row, dt) { if (index % 2 === 1) { return { classes: 'even' }; } }",
+      style = "font-size: 12px;"
+    )
+  )
+cx_tbl
+```
+
+### Chart
+
+```{r chart}
+chart_up <- cx_chart_up %>% 
+  ggplot(aes(x = Month, y = Customer_Count, color = as.factor(Group), group = as.factor(Group), linetype = as.factor(Group))) +
+  geom_line() +
+  labs(x = "Month", y = "Customer Count", color = "Group") +
+  scale_color_manual(values = c("orange", "blue", "green", "red")) +
+  scale_linetype_manual(values = c("solid", "solid", "solid", "dotted")) +
+  theme_minimal()
+
+plotly::ggplotly(chart_up)
+```
+
+</p>
+
+</details>
