@@ -11,7 +11,7 @@ output:
     toc: yes
     toc_depth: 1
 params:
-  cx: 1.3
+  cx: 1.15
 ---
 
 ```{r setup, include=FALSE}
