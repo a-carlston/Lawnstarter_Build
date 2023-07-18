@@ -11,7 +11,7 @@ output:
     toc: yes
     toc_depth: 1
 params:
-  cx: 1.15
+  cx: 1.3
 ---
 
 ```{r setup, include=FALSE}
@@ -26,13 +26,16 @@ knitr::opts_chunk$set(
 ```
 
 ```{r libraries}
+library(DT)
 library(tidyverse)
 library(lubridate)
 library(tidyquant)
 library(plotly)
 library(shiny)
 library(openxlsx)
-library(DT)
+library(ggrepel)
+
+
 ```
 
 # Customer Count
@@ -47,24 +50,26 @@ Customer Count is being used as predictive variable that controls the growth rat
 ```{r data}
 sys.source("../00_Scripts/functions.R", envir = env <- new.env())
 
-cx <- env[["customer_count_data"]]() 
-cx_up <- env[["cx_up"]](cx,value = params$cx)
-cx_chart_up <- env[["cx_chart_up"]](cx,value = params$cx)
+# Customer count Data
+cx_data <- env[["customer_count_data"]]() 
+
+
+# Provider Data
+Provider_Forecast <- read_csv("../00_Data/Provider_Forecasts/Phone/h20_Provider_Phone_2023-07-17_12_37_.csv")
+
+
+
 
 ```
 
 <details>
-
-<summary>Click to show/hide data table and chart</summary>
-
-<p>
-
-##  {.tabset .tabset-fade .tabset-pills .no-tabset-title}
+<summary>Customer Data</summary>
+## {.tabset .tabset-fade .tabset-pills .no-tabset-title}
 
 ### Table
 
-```{r table}
-cx_tbl <- cx_up %>%  
+```{r table cx}
+cx_up %>%  
   DT::datatable(
     extensions = c('Buttons', 'Scroller'),
     options = list(
@@ -87,12 +92,11 @@ cx_tbl <- cx_up %>%
       style = "font-size: 12px;"
     )
   )
-cx_tbl
 ```
 
 ### Chart
 
-```{r chart}
+```{r chart cx}
 chart_up <- cx_chart_up %>% 
   ggplot(aes(x = Month, y = Customer_Count, color = as.factor(Group), group = as.factor(Group), linetype = as.factor(Group))) +
   geom_line() +
@@ -104,6 +108,63 @@ chart_up <- cx_chart_up %>%
 plotly::ggplotly(chart_up)
 ```
 
-</p>
 
+# Forecast
+</details>
+<details>
+<summary>Forecast Data</summary>
+## {.tabset .tabset-fade .tabset-pills .no-tabset-title}
+
+### Table
+
+```{r table provider}
+Provider_Phone %>%  
+  DT::datatable(
+    extensions = c('Buttons', 'Scroller'),
+    options = list(
+      dom = 'Blrtip',
+      buttons = list(
+        list(
+          extend = 'excel',
+          text = 'Export to Excel'
+        ),
+        list(
+          extend = 'csv',
+          text = 'Export to CSV'
+        )
+      ),
+      defaultPageSize = 20,
+      scrollY = "450px",
+      scrollX = TRUE,
+      scroller = TRUE,
+      rowStyle = "function(index, row, dt) { if (index % 2 === 1) { return { classes: 'even' }; } }",
+      style = "font-size: 12px;"
+    )
+  )
+```
+
+### Chart
+
+```{r chart provider}
+
+modified_df <- Provider_Phone
+
+# Get unique values of holiday_name_event for assigning shapes
+unique_holidays <- unique(modified_df$holiday_name_event)
+
+
+forecast_Chart <- ggplot(modified_df, aes(x = Date, y = Forecast, group = .key, color = .key)) +
+  geom_line() +
+  geom_text_repel(aes(label = holiday_name_event), hjust = 0, vjust = 1, nudge_x = 0.1, size = 3) +
+  geom_point(data = modified_df[!is.na(modified_df$holiday_name_event), ], aes(shape = holiday_name_event), size = 4) +
+  scale_shape_manual(values = 1:length(unique_holidays)) +
+  labs(title = "Forecast by Group",
+       x = "Date",
+       y = "Forecast",
+       color = "Group") +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, NA))
+
+plotly::ggplotly(forecast_Chart)
+```
 </details>
