@@ -15,12 +15,12 @@ customer_count_data <- function(path = "", sheet = "", col_types = "", ...) {
   }
   
   path <- dplyr::case_when(
-    path == "" ~ "G:\\Shared drives\\WFM\\Customer_Count\\LS Customer Count 7.11.23.xlsx",
+    path == "" ~ "G:\\Shared drives\\WFM\\Customer_Count\\LS Customer Count 7.18.23.xlsx",
     TRUE ~ path
   )
   
   sheet <- dplyr::case_when(
-    sheet == "" ~ "Customer_Count",
+    sheet == "" ~ "Green",
     TRUE ~ sheet
   )
   
@@ -37,20 +37,21 @@ customer_count_data <- function(path = "", sheet = "", col_types = "", ...) {
   return(data)
 }
 
-daily_customer_count_tbl <- function(){
+daily_customer_count_tbl <- function(path = "", sheet = "", col_types = "", ...){
   # Load Data
-  env[["customer_count_data"]]() %>% 
+  env[["customer_count_data"]](path = "", sheet = "", col_types = "", ...) %>% 
     
     # Expand to Dialy
     dplyr::group_by(Year) %>% 
-    tidyr::expand(Date = seq(min(Date),
-                             max(Date)+lubridate::days(30),
+    tidyr::expand(Date = seq(min(Date)-lubridate::days(30),
+                             max(Date),
                              by = "day")) %>%
     dplyr::mutate(Month = format(Date, "%b"), 
                   DIM = lubridate::days_in_month(Date)) %>%
     
-    # Bring in Customer Count data and divid by day to get daily  
-    left_join(env[["customer_count_data"]]() %>% dplyr::select(-Date), 
+    # Bring in Customer Count data and divide by day to get daily  
+    left_join(env[["customer_count_data"]](path = "", sheet = "", col_types = "", ...) %>% 
+                dplyr::select(-Date), 
               by = c("Year"="Year", 
                      "Month"="Month")) %>%
     dplyr::mutate(Customer_Count = round(Customer_Count/DIM))
@@ -209,7 +210,56 @@ forecast_Chart <-function(data,u) {
   coord_cartesian(ylim = c(0, NA))
 }
 
+calibration_tbl <- function(workflow, splits) {
+  modeltime::modeltime_table(
+    workflow
+  ) %>%
+    modeltime::modeltime_calibrate(new_data = rsample::testing(splits))
+}
+
+accuracy_tbl <- function(workflow, splits) {
+  calibration_tbl(workflow, splits) %>% 
+    modeltime::modeltime_accuracy() 
+}
 
 
+accuracy_chart <- function(workflow, splits, current_tbl){
+  modeltime::modeltime_table(
+    workflow
+  ) %>%
+    modeltime::modeltime_calibrate(new_data = rsample::testing(splits)) %>% 
+    modeltime::modeltime_forecast(
+      new_data = rsample::testing(splits),
+      actual_data = current_tbl,
+      keep_data = T
+    ) %>% 
+    modeltime::plot_modeltime_forecast(.conf_interval_show = F)
+  
+}
 
+refit_tbl <- function(workflow, splits, current_tbl){
+  calibration_tbl(workflow, splits) %>% 
+  modeltime::modeltime_refit(data = current_tbl)
+}
+
+refit_chart <- function(refit, current_tbl, forecast_tbl){
+  modeltime::modeltime_forecast(object = refit,
+                     new_data = forecast_tbl,
+                     actual_data = current_tbl, 
+                     keep_data = T) %>% 
+  modeltime::plot_modeltime_forecast(.conf_interval_show = F)
+}
+
+Invert_forecast_tbl <- function(refit,current_tbl,forecast_tbl){
+  
+  refit %>%
+    modeltime::modeltime_forecast(
+      new_data = forecast_tbl,
+      actual_data = current_tbl, keep_data = T
+    ) %>% 
+    # Invert Transformation
+    dplyr::mutate(dplyr::across(.value:.conf_hi, .fns = ~ expm1(.))) %>% 
+    ungroup()
+  
+}
 

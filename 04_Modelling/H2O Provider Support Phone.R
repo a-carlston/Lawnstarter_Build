@@ -85,12 +85,6 @@ recipe_act_spec_base <- recipes::recipe(NCO_trans_clean_drop ~ ., data = trainin
   
   # Standardization
   recipes::step_normalize(matches("(index.num)|(year)|(yday)"))
-  
-  # Dummy Encoding (One Hot Encoding)
-  # step_dummy(all_nominal(), one_hot = TRUE)
-
-# Interaction
-# step_interact(~ matches("week2") * matches("wday.lbl")) %>%
 
 # Fourier
 # step_fourier(date_rounded, period = c(7, 14, 30, 90, 365), K = 2)
@@ -184,8 +178,8 @@ forecast_Chart <- ggplot(modified_df, aes(x = Date, y = Forecast, group = .key, 
 plotly::ggplotly(forecast_Chart)
 
 
-# h2o.shutdown()
-
+h2o.shutdown()
+y
 # Export Data ----
 current_datetime <- format(Sys.time(), "%Y-%m-%d_%H_%M")
 filename <- paste("h20_Provider_Phone", current_datetime, ".csv", sep = "_")
@@ -195,3 +189,19 @@ file_path <- paste0(output_directory, filename)
 
 
 write.csv(modified_df, file = file_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
