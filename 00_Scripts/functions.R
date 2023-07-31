@@ -20,7 +20,7 @@ customer_count_data <- function(path = "", sheet = "", col_types = "", ...) {
   )
   
   sheet <- dplyr::case_when(
-    sheet == "" ~ "Green",
+    sheet == "" ~ "50%",
     TRUE ~ sheet
   )
   
@@ -37,25 +37,34 @@ customer_count_data <- function(path = "", sheet = "", col_types = "", ...) {
   return(data)
 }
 
-daily_customer_count_tbl <- function(path = "", sheet = "", col_types = "", ...){
+daily_customer_count_tbl <- function(path = "G:\\Shared drives\\WFM\\Customer_Count\\LS Customer Count 7.18.23.xlsx", sheet = "50%", col_types = c("date", "numeric", "numeric"), ...) {
+  if (!require("dplyr")) {
+    stop("dplyr package not found.")
+  }
+  
   # Load Data
-  env[["customer_count_data"]](path = "", sheet = "", col_types = "", ...) %>% 
+  data <- readxl::read_excel(path = path, sheet = sheet, col_types = col_types, ...)
+  
+  data <- data %>%
+    mutate(Month = lubridate::month(Date, label = TRUE))
+  
+  # Expand to Daily
+  daily_data <- data %>%
+    group_by(Year) %>%
+    tidyr::expand(Date = seq(min(Date) - lubridate::days(30), max(Date), by = "day")) %>%
+    mutate(Month = format(Date, "%b"), DIM = lubridate::days_in_month(Date))
+  
+  # Bring in Customer Count data and divide by day to get daily  
+  result <- daily_data %>%
+    left_join(data %>% dplyr::select(-Date), by = c("Year" = "Year", "Month" = "Month")) %>%
+    mutate(Customer_Count = round(Customer_Count / DIM)) %>% 
     
-    # Expand to Dialy
-    dplyr::group_by(Year) %>% 
-    tidyr::expand(Date = seq(min(Date)-lubridate::days(30),
-                             max(Date),
-                             by = "day")) %>%
-    dplyr::mutate(Month = format(Date, "%b"), 
-                  DIM = lubridate::days_in_month(Date)) %>%
-    
-    # Bring in Customer Count data and divide by day to get daily  
-    left_join(env[["customer_count_data"]](path = "", sheet = "", col_types = "", ...) %>% 
-                dplyr::select(-Date), 
-              by = c("Year"="Year", 
-                     "Month"="Month")) %>%
-    dplyr::mutate(Customer_Count = round(Customer_Count/DIM))
+  # Remove DIM
+    select(-DIM)
+  
+  return(result)
 }
+
 
 year_update <- function(data, year, percentage) {
   if (!requireNamespace("tidyr", quietly = TRUE)) {
@@ -186,7 +195,8 @@ prepared_tbl <- function(data,holiday,customer) {
     dplyr::mutate(holiday_name = ifelse(is.na(holiday_name), 0, holiday_name)) %>%
     
     # Add Untis/adds
-    left_join(customer %>% filter(Date >= as.Date(min), Date <= as.Date(max)), by = c("Date" = "Date")) %>%
+    left_join(customer, by = c("Date" = "Date")) %>%
+    dplyr::mutate(Customer_Count = log1p(`Customer_Count`)) %>%
     
     # Format Columns
     rename(holiday_name_event = holiday_name) %>% 
@@ -259,6 +269,7 @@ Invert_forecast_tbl <- function(refit,current_tbl,forecast_tbl){
     ) %>% 
     # Invert Transformation
     dplyr::mutate(dplyr::across(.value:.conf_hi, .fns = ~ expm1(.))) %>% 
+    dplyr::mutate(Customer_Count = expm1(Customer_Count)) %>% 
     ungroup()
   
 }

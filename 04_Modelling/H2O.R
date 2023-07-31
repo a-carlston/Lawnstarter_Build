@@ -87,7 +87,7 @@ recipe_act_spec_base <- recipes::recipe(NCO_trans_clean_drop ~ ., data = trainin
   
   # Dummy Encoding (One Hot Encoding)
   # step_dummy(all_nominal(), one_hot = TRUE)
-
+?step_dummy
 # Interaction
 # step_interact(~ matches("week2") * matches("wday.lbl")) %>%
 

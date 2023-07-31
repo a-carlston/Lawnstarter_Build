@@ -2,16 +2,19 @@ sys.source("./00_Scripts/functions.R", envir = env <- new.env())
 library(dplyr)
 library(h2o)
 library(modeltime.h2o)
+library(recipes)
+
 
 # Paramaters:
         CS <- "Customer Support"
         PS <- "Provider Support"
+        Sheet <- "Green"
 
 ## Load Data ----
 ### Phone 
 daily_phone_tbl <- env[["amazon_phone"]]()
 
-daily_customer_count_tbl <- env[["daily_customer_count_tbl"]](path = "G:\\Shared drives\\WFM\\Customer_Count\\LS Customer Count 7.18.23.xlsx")
+daily_customer_count_tbl <- env[["daily_customer_count_tbl"]](path = "G:\\Shared drives\\WFM\\Customer_Count\\LS Customer Count 7.18.23.xlsx", sheet = Sheet)
 
 Holidays_tbl <- env[["Holidays_tbl"]](2022:2024)
 
@@ -102,7 +105,8 @@ CS_recipe <- recipes::recipe(NCO_trans_clean_drop ~ ., data = rsample::training(
     recipes::step_rm(matches("(iso)|(xts)|(hour)|(minute)|(second)|(am.pm)")) %>%
     
     # Standardization
-    recipes::step_normalize(matches("(index.num)|(year)|(yday)"))
+    recipes::step_normalize(matches("(index.num)|(year)|(yday)")) %>% 
+    step_dummy(all_nominal(), one_hot = TRUE)
 
 PS_recipe <- recipes::recipe(NCO_trans_clean_drop ~ ., data = rsample::training(PS_Splits)) %>%
   
@@ -111,7 +115,10 @@ PS_recipe <- recipes::recipe(NCO_trans_clean_drop ~ ., data = rsample::training(
   recipes::step_rm(matches("(iso)|(xts)|(hour)|(minute)|(second)|(am.pm)")) %>%
   
   # Standardization
-  recipes::step_normalize(matches("(index.num)|(year)|(yday)"))
+  recipes::step_normalize(matches("(index.num)|(year)|(yday)")) %>% 
+  
+  # Dummy Encoding (One Hot Encoding)
+  step_dummy(all_nominal(), one_hot = TRUE)
 
 CS_recipe %>% recipes::prep() %>% recipes::juice() %>% glimpse()
 
@@ -189,14 +196,14 @@ PS_forecast_complete %>% modeltime::plot_modeltime_forecast(.conf_interval_show 
 
 ## CS
 current_datetime <- format(Sys.time(), "%Y-%m-%d_%H_%M")
-CS_filename <- paste("h20_Customer_Phone", current_datetime, ".csv", sep = "_")
+CS_filename <- paste(Sheet, "_h20_Customer_Phone", current_datetime, ".csv", sep = "_")
 CS_output_directory <- "./00_Data/Customer_Forecasts/Phone/"
 CS_file_path <- paste0(CS_output_directory, CS_filename)
 
-write.csv(PS_forecast_complete, file = CS_file_path)
+write.csv(CS_forecast_complete, file = CS_file_path)
 
 ## Provider
-PS_filename <- paste("h20_Provider_Phone", current_datetime, ".csv", sep = "_")
+PS_filename <- paste(Sheet, "_h20_Provider_Phone", current_datetime, ".csv", sep = "_")
 PS_output_directory <- "./00_Data/Provider_Forecasts/Phone/"
 PS_file_path <- paste0(PS_output_directory, PS_filename)
 
@@ -205,7 +212,7 @@ PS_file_path <- paste0(PS_output_directory, PS_filename)
 write.csv(PS_forecast_complete, file = PS_file_path)
 
 
-
+# h2o.shutdown(prompt = F)
 
 
 
